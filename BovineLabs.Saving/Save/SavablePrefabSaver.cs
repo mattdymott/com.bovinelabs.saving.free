@@ -206,6 +206,7 @@ namespace BovineLabs.Saving
                     EntityPartialMappingWriter = entityMap.EntityPartialMapping.AsParallelWriter(),
                     EntityMapping = entityMappingClone,
                     Links = this.saveableLinks,
+                    SavedLinks = savedLinks
                 }
                 .ScheduleParallel(savedLinks, 256, dependency);
 
@@ -523,7 +524,7 @@ namespace BovineLabs.Saving
         }
 
         [BurstCompile]
-        private struct RemapLinks : IJobHashMapVisitKeyValue
+        private struct RemapLinks : IJobParallelHashMapDefer//IJobHashMapVisitKeyValue
         {
             public NativeParallelHashMap<Entity, Entity>.ParallelWriter EntityMappingWriter;
 
@@ -535,9 +536,14 @@ namespace BovineLabs.Saving
             [ReadOnly]
             public BufferLookup<SavableLinks> Links;
 
-            public void ExecuteNext(byte* keys, byte* values, int entryIndex)
+            [ReadOnly]
+            public NativeParallelHashMap<Entity, UnsafeList<SavableLinks>> SavedLinks;
+
+            public void ExecuteNext(int entryIndex, int jobIndex)
+            //public void ExecuteNext(byte* keys, byte* values, int entryIndex)
             {
-                this.Read(entryIndex, keys, values, out Entity key, out UnsafeList<SavableLinks> value);
+	            this.Read(SavedLinks, entryIndex, out var key, out var value);
+                //this.Read(entryIndex, keys, values, out Entity key, out UnsafeList<SavableLinks> value);
                 var entity = this.EntityMapping[key];
 
                 if (!this.Links.TryGetBuffer(entity, out var links))
